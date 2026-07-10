@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simulacao</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 24px;
+        color: #111;
+        background: white;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+      }
+
+      section,
+      aside {
+        border: 1px solid #aaa;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        margin-bottom: 6px;
+      }
+
+      h2 {
+        margin-top: 0;
+        font-size: 18px;
+      }
+
+      button,
+      select {
+        padding: 6px 10px;
+        font-size: 15px;
+      }
+
+      .controls {
+        margin: 16px 0;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .step,
+      .block,
+      .thread {
+        border: 1px solid #bbb;
+        padding: 8px;
+      }
+
+      .active {
+        background: #eee;
+        border-color: #111;
+      }
+
+      .done {
+        background: #f7f7f7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 8px;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        min-height: 250px;
+        max-height: 340px;
+        overflow: auto;
+        background: #f7f7f7;
+        padding: 10px;
+        border: 1px solid #ddd;
+      }
+
+      .small {
+        color: #555;
+        font-size: 14px;
+      }
+
+      @media (max-width: 850px) {
+        main,
+        .steps {
+          display: block;
+        }
+
+        .step {
+          margin-bottom: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <label for="threadSelect">Threads:</label>
+      <select id="threadSelect">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4" selected>4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+      </select>
+      <button id="runButton">Executar</button>
+    </div>
+
+    <main>
+      <div>
+        <section>
+          <h2>Etapas</h2>
+          <div class="steps">
+            <div class="step" data-step="main"><strong>1. main</strong></div>
+            <div class="step" data-step="mmap"><strong>2. mmap</strong></div>
+            <div class="step" data-step="split"><strong>3. split</strong></div>
+            <div class="step" data-step="map"><strong>4. map</strong></div>
+          </div>
+        </section>
+
+        <section data-box="split">
+          <h2>Blocos criados pelo split</h2>
+          <div class="grid" id="blocks"></div>
+        </section>
+
+        <section data-box="map">
+          <h2>Threads na fase map</h2>
+          <div class="grid" id="threads"></div>
+        </section>
+      </div>
+
+      <aside>
+        <h2>Terminal</h2>
+        <pre id="terminal">
+$ ./authanalyzer data/auth_5M.log 4
+aguardando...</pre
+        >
+      </aside>
+    </main>
+
+    <script>
+      const threadSelect = document.querySelector("#threadSelect");
+      const runButton = document.querySelector("#runButton");
+      const blocks = document.querySelector("#blocks");
+      const threads = document.querySelector("#threads");
+      const terminal = document.querySelector("#terminal");
+      const stepEls = [...document.querySelectorAll(".step")];
+      const boxEls = [...document.querySelectorAll("[data-box]")];
+
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      function selectedThreads() {
+        return Number(threadSelect.value);
+      }
+
+      function renderThreadUi() {
+        const count = selectedThreads();
+        blocks.innerHTML = "";
+        threads.innerHTML = "";
+
+        for (let i = 0; i < count; i++) {
+          blocks.insertAdjacentHTML(
+            "beforeend",
+            `
+          <div class="block">
+            <strong>Block ${i}</strong>
+          </div>
+        `,
+          );
+
+          threads.insertAdjacentHTML(
+            "beforeend",
+            `
+          <div class="thread">
+            <strong>Thread ${i}</strong>
+          </div>
+        `,
+          );
+        }
+      }
+
+      function resetUi() {
+        renderThreadUi();
+        terminal.textContent = `$ ./authanalyzer data/auth_5M.log ${selectedThreads()}\n`;
+        stepEls.forEach((el) => el.classList.remove("active", "done"));
+        boxEls.forEach((el) => el.classList.remove("active", "done"));
+      }
+
+      function activate(stepName, boxName) {
+        const index = stepEls.findIndex((el) => el.dataset.step === stepName);
+
+        stepEls.forEach((el, i) => {
+          el.classList.toggle("active", el.dataset.step === stepName);
+          el.classList.toggle("done", i < index);
+        });
+
+        boxEls.forEach((el) => {
+          el.classList.toggle("active", el.dataset.box === boxName);
+        });
+      }
+
+      function done(boxName) {
+        const box = boxEls.find((el) => el.dataset.box === boxName);
+        if (box) {
+          box.classList.remove("active");
+          box.classList.add("done");
+        }
+      }
+
+      async function log(lines) {
+        for (const line of lines) {
+          terminal.textContent += line + "\n";
+          terminal.scrollTop = terminal.scrollHeight;
+          await sleep(250);
+        }
+      }
+
+      async function run() {
+        const count = selectedThreads();
+        runButton.disabled = true;
+        threadSelect.disabled = true;
+        resetUi();
+
+        activate("main", null);
+        await log(["[main.c] argumentos ok", `[main.c] n_threads = ${count}`]);
+        await sleep(300);
+
+        activate("mmap", null);
+        await log([
+          "[mmap_utils.c] open + fstat",
+          "[mmap_utils.c] mmap -> mf.data",
+        ]);
+        await sleep(300);
+
+        activate("split", "split");
+        await log([
+          "[split.c] chunk = size / n_threads",
+          `[split.c] ${count} bloco(s) criado(s)`,
+        ]);
+        done("split");
+        await sleep(300);
+
+        activate("map", "map");
+        await log([
+          `[auth_analyzer.c] pthread_create x${count}`,
+          "[map.c] procura Failed",
+          "[log_parser.c] extrai IP depois de ' from '",
+          "[hashtable.c] ht_increment(local_ht, ip)",
+          "[auth_analyzer.c] pthread_join",
+        ]);
+        done("map");
+        await sleep(300);
+
+        stepEls.forEach((el) => {
+          el.classList.remove("active");
+          el.classList.add("done");
+        });
+
+        terminal.textContent +=
+          "[cleanup] ht_destroy + unmap_file\n[exit] status 0\n";
+        terminal.scrollTop = terminal.scrollHeight;
+
+        runButton.disabled = false;
+        threadSelect.disabled = false;
+      }
+
+      threadSelect.addEventListener("change", renderThreadUi);
+      runButton.addEventListener("click", run);
+      renderThreadUi();
+    </script>
+  </body>
+</html>

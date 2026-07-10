@@ -1,0 +1,6 @@
+authanalyzer
+data/*.log
+archive/
+.vscode/
+.codex/
+.agents/

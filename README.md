@@ -6,7 +6,7 @@ O programa lê um arquivo `auth.log`, divide o conteúdo em blocos, processa os
 blocos com `pthread`, conta falhas de autenticação por IP e imprime um relatório
 com os IPs mais recorrentes.
 
-## Compilação
+## compilação
 
 ```bash
 make
@@ -18,7 +18,7 @@ Para limpar os arquivos gerados:
 make clean
 ```
 
-## Execução
+## execução
 
 Formato:
 
@@ -38,7 +38,7 @@ O segundo argumento define a quantidade de threads. Exemplo com 8 threads:
 ./authanalyzer data/auth_5M.log 8
 ```
 
-## Fluxo do programa
+## fluxo do programa
 
 ```text
 main.c
@@ -51,7 +51,7 @@ main.c
       -> report.c       imprime o relatório final
 ```
 
-## Estrutura principal
+## estrutura principal
 
 - `src/main.c`: entrada do programa e validação dos argumentos.
 - `src/auth_analyzer.c`: orquestra o fluxo principal.
@@ -62,7 +62,7 @@ main.c
 - `src/utils/log_parser.c`: identificação de falhas e extração de IP.
 - `src/utils/report.c`: impressão do resultado.
 
-## Teste básico
+## teste básico
 
 ```bash
 make clean && make
@@ -72,3 +72,8 @@ make clean && make
 ```
 
 As contagens finais devem ser equivalentes para qualquer quantidade de threads.
+
+## para pegar os logs com mais Failed em /data
+```bash
+grep "Failed" auth_5M.log | wc -l
+```

@@ -1,4 +1,6 @@
 authanalyzer
+ARQUITETURA.md
+TESTING.md
 data/*.log
 archive/
 .vscode/
